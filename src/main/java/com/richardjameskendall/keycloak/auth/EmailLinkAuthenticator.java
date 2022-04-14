@@ -10,7 +10,6 @@ package com.richardjameskendall.keycloak.auth;
 import com.richardjameskendall.ses.EmailSender;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
-import org.keycloak.authentication.Authenticator;
 import org.keycloak.authentication.authenticators.browser.AbstractUsernameFormAuthenticator;
 import org.keycloak.common.util.KeycloakUriBuilder;
 import org.keycloak.models.KeycloakSession;
@@ -26,7 +25,7 @@ import java.util.Map;
 
 import org.jboss.logging.Logger;
 
-public class EmailLinkAuthenticator extends AbstractUsernameFormAuthenticator implements Authenticator {
+public class EmailLinkAuthenticator extends AbstractUsernameFormAuthenticator {
 
     private static final Logger logger = Logger.getLogger("com.richardjameskendall.keycloak.auth");
 
@@ -43,7 +42,7 @@ public class EmailLinkAuthenticator extends AbstractUsernameFormAuthenticator im
 
         // if create user is turned on then first we check the domain suffix
 
-        if(createUsers) {
+        if (createUsers) {
             logger.info("Create users is enabled.");
             // check email address is from an allowed domain
             String allowedDomains = config.get("email.allowed.suffix");
@@ -59,7 +58,7 @@ public class EmailLinkAuthenticator extends AbstractUsernameFormAuthenticator im
                 logger.info("Email suffix matches an allowed domain");
 
                 // handle user
-                UserModel user = context.getSession().users().getUserByEmail(email, context.getRealm());
+                UserModel user = context.getSession().users().getUserByEmail(context.getRealm(), email);
                 if (user == null) {
                     // Register user
                     user = context.getSession().users().addUser(context.getRealm(), email);
@@ -69,18 +68,20 @@ public class EmailLinkAuthenticator extends AbstractUsernameFormAuthenticator im
 
                 // generate key and store it
                 String key = KeycloakModelUtils.generateId();
-                context.getAuthenticationSession().setAuthNote("email-key", key);
+                context.getAuthenticationSession().setAuthNote("magic-key", key);
 
                 // generate link
-                String link = KeycloakUriBuilder.fromUri(context.getRefreshExecutionUrl()).queryParam("key", key).build().toString();
+                String link = KeycloakUriBuilder.fromUri(context.getRefreshExecutionUrl()).queryParam("key", key)
+                        .build().toString();
 
                 try {
                     // send email
                     HashMap<String, String> fields = new HashMap<>();
                     fields.put("email", email);
                     fields.put("link", link);
-                    EmailSender sender = new EmailSender(config.get("aws.region"));
-                    sender.sendWithTemplate(email, config.get("email.from.address"), config.get("email.ses.template"), fields);
+                    EmailSender sender = new EmailSender(config.get("aws.region"), config.get("email.ses.config-set"));
+                    sender.sendWithTemplate(email, config.get("email.from.address"), config.get("email.ses.template"),
+                            fields);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -91,25 +92,27 @@ public class EmailLinkAuthenticator extends AbstractUsernameFormAuthenticator im
         } else {
             logger.info("Create users is disabled");
             // lookup user
-            UserModel user = context.getSession().users().getUserByEmail(email, context.getRealm());
-            if(user == null) {
+            UserModel user = context.getSession().users().getUserByEmail(context.getRealm(), email);
+            if (user == null) {
                 logger.info("User does not exist");
                 context.failure(AuthenticationFlowError.INVALID_CREDENTIALS);
             } else {
                 // generate key and store it
                 String key = KeycloakModelUtils.generateId();
-                context.getAuthenticationSession().setAuthNote("email-key", key);
+                context.getAuthenticationSession().setAuthNote("magic-key", key);
 
                 // generate link
-                String link = KeycloakUriBuilder.fromUri(context.getRefreshExecutionUrl()).queryParam("key", key).build().toString();
+                String link = KeycloakUriBuilder.fromUri(context.getRefreshExecutionUrl()).queryParam("key", key)
+                        .build().toString();
 
                 try {
                     // send email
                     HashMap<String, String> fields = new HashMap<>();
                     fields.put("email", email);
                     fields.put("link", link);
-                    EmailSender sender = new EmailSender(config.get("aws.region"));
-                    sender.sendWithTemplate(email, config.get("email.from.address"), config.get("email.ses.template"), fields);
+                    EmailSender sender = new EmailSender(config.get("aws.region"), config.get("email.ses.config-set"));
+                    sender.sendWithTemplate(email, config.get("email.from.address"), config.get("email.ses.template"),
+                            fields);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -120,9 +123,9 @@ public class EmailLinkAuthenticator extends AbstractUsernameFormAuthenticator im
         }
     }
 
-    //@Override
+    // @Override
     public void authenticate(AuthenticationFlowContext context) {
-        String sessionKey = context.getAuthenticationSession().getAuthNote("email-key");
+        String sessionKey = context.getAuthenticationSession().getAuthNote("magic-key");
         if (sessionKey != null) {
             String requestKey = context.getHttpRequest().getUri().getQueryParameters().getFirst("key");
             if (requestKey != null) {
@@ -139,17 +142,17 @@ public class EmailLinkAuthenticator extends AbstractUsernameFormAuthenticator im
         }
     }
 
-    //@Override
+    // @Override
     public boolean requiresUser() {
         return false;
     }
 
-    //@Override
+    // @Override
     public boolean configuredFor(KeycloakSession session, RealmModel realm, UserModel user) {
         return true;
     }
 
-    //@Override
+    // @Override
     public void setRequiredActions(KeycloakSession session, RealmModel realm, UserModel user) {
     }
 

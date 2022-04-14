@@ -57,6 +57,14 @@ public class EmailLinkAuthenticatorFactory implements AuthenticatorFactory {
         sesTemplate.setHelpText("The name of the AWS SES template used to send emails");
         configProperties.add(sesTemplate);
 
+        ProviderConfigProperty sesConfigSet;
+        sesConfigSet = new ProviderConfigProperty();
+        sesConfigSet.setName("email.ses.config-set");
+        sesConfigSet.setLabel("SES Config Set Name");
+        sesConfigSet.setType(ProviderConfigProperty.STRING_TYPE);
+        sesConfigSet.setHelpText("The name of the AWS SES Config Set Name");
+        configProperties.add(sesConfigSet);
+
         ProviderConfigProperty createUsers;
         createUsers = new ProviderConfigProperty();
         createUsers.setName("user.create");
